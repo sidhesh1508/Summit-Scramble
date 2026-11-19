@@ -20,8 +20,15 @@ public class PlayerController : MonoBehaviour
     [SerializeField]
     private float maxPitchAngle = 70.0f;
     [SerializeField]
-    private float minPitchAngle = -70.0f;
 
+    private float minPitchAngle = -70.0f;
+    [SerializeField]
+
+    private Animator animator = null;
+    [SerializeField]
+    private float runSpeed = 10.0f;
+    private MovingPlatform currentPlatform = null;
+    private bool isRunning = false;
     private Rigidbody rigidBody = null;
     private PlayerInput playerInput = null;
     private InputAction moveInput = null;
@@ -64,14 +71,29 @@ public class PlayerController : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        
         Vector2 move = moveInput.ReadValue<Vector2>();
+        isRunning = Keyboard.current != null
+            && Keyboard.current.leftShiftKey.isPressed
+            && move.sqrMagnitude > 0.1f;
+        if (animator != null)
+        {
+            animator.SetBool("IsMoving", move.sqrMagnitude > 0.1f);
+
+            bool grounded = groundCheck.IsGrounded
+                            && rigidBody.linearVelocity.y <= 0.1f;
+
+            animator.SetBool("IsGrounded", grounded);
+            animator.SetBool("IsRunning", isRunning);
+        }
         Vector2 look = lookInput.ReadValue<Vector2>();
         //wasd move in direction of facing
         Vector3 fwd = transform.forward;
         Vector3 right = transform.right;
         fwd.y = 0.0f;
         right.y = 0.0f;
-        moveVelocity = ((fwd * move.y) + (right * move.x)) * moveSpeed;
+        float currentSpeed = isRunning ? runSpeed : moveSpeed;
+        moveVelocity = ((fwd * move.y) + (right * move.x)) * currentSpeed;
         //look input from the mouse
         turnVelocity.y = look.x * turnSpeed;
         if(invertY)
@@ -83,8 +105,18 @@ public class PlayerController : MonoBehaviour
     }
     private void FixedUpdate()
     {
-        moveVelocity.y = rigidBody.linearVelocity.y;
-        rigidBody.linearVelocity = moveVelocity;
+        Vector3 velocity = moveVelocity;
+        velocity.y = rigidBody.linearVelocity.y;
+
+        if (currentPlatform != null &&
+            groundCheck.IsGrounded &&
+            rigidBody.linearVelocity.y <= 0.1f)
+        {
+            velocity.x += currentPlatform.Velocity.x;
+            velocity.z += currentPlatform.Velocity.z;
+        }
+
+        rigidBody.linearVelocity = velocity;
         rigidBody.angularVelocity = turnVelocity;
     }
     private void LateUpdate()
@@ -98,6 +130,43 @@ public class PlayerController : MonoBehaviour
             Vector3 jumpVelocity = rigidBody.linearVelocity;
             jumpVelocity.y = jumpSpeed;
             rigidBody.linearVelocity = jumpVelocity;
+            currentPlatform = null;
+        }
+    }
+    private void OnCollisionStay(Collision collision)
+    {
+        MovingPlatform platform =
+            collision.gameObject.GetComponentInParent<MovingPlatform>();
+
+        if (platform == null)
+        {
+            return;
+        }
+
+        // Only ride the platform when standing on its top.
+        for (int i = 0; i < collision.contactCount; i++)
+        {
+            if (collision.GetContact(i).normal.y > 0.5f)
+            {
+                currentPlatform = platform;
+                return;
+            }
+        }
+
+        if (currentPlatform == platform)
+        {
+            currentPlatform = null;
+        }
+    }
+
+    private void OnCollisionExit(Collision collision)
+    {
+        MovingPlatform platform =
+            collision.gameObject.GetComponentInParent<MovingPlatform>();
+
+        if (platform != null && currentPlatform == platform)
+        {
+            currentPlatform = null;
         }
     }
 }

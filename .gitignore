@@ -10,3 +10,8 @@
 *.sln
 *.slnx
 *.user
+# Character pack source archives and package installers
+/Assets/FreeTestCharacterAsuna/**/*.zip
+/Assets/FreeTestCharacterAsuna/**/*.zip.meta
+/Assets/FreeTestCharacterAsuna/**/*.unitypackage
+/Assets/FreeTestCharacterAsuna/**/*.unitypackage.meta
